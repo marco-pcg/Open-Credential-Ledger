@@ -1,0 +1,79 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil,english]{babel}
+\usepackage[left=3cm,top=3cm,right=2cm,bottom=2cm]{geometry}
+\usepackage{newtxtext,newtxmath}
+\usepackage{setspace}
+\usepackage[hidelinks]{hyperref}
+\onehalfspacing
+\newcommand{\autor}{[NOME DO AUTOR -- A CONFIRMAR]}
+\newcommand{\orientador}{[NOME E TITULAÇÃO DO ORIENTADOR -- A CONFIRMAR]}
+\newcommand{\curso}{[CURSO -- A CONFIRMAR]}
+\newcommand{\campus}{[CAMPUS E CIDADE -- A CONFIRMAR]}
+\newcommand{\titulo}{Open Credential Ledger: verificação de credenciais acadêmicas com registros de emissores em blockchain}
+\begin{document}
+\selectlanguage{brazil}
+\begin{titlepage}\centering
+CENTRO FEDERAL DE EDUCAÇÃO TECNOLÓGICA CELSO SUCKOW DA FONSECA\\CEFET/RJ\\\curso
+\vspace{3cm}
+\autor
+\vfill
+{\Large\bfseries\titulo\par}
+\vfill
+\campus\\[ANO DE ENTREGA -- A CONFIRMAR]
+\end{titlepage}
+\begin{titlepage}\centering
+\autor\vfill
+{\Large\bfseries\titulo\par}\vspace{2cm}
+\begin{flushright}\begin{minipage}{0.55\textwidth}\singlespacing
+Trabalho de [NATUREZA A CONFIRMAR] apresentado ao CEFET/RJ como requisito para [GRAU E CURSO A CONFIRMAR].\\
+Orientador(a): \orientador\\
+Coorientador(a): [A CONFIRMAR, SE APLICÁVEL]
+\end{minipage}\end{flushright}\vfill
+\campus\\[ANO A CONFIRMAR]
+\end{titlepage}
+\chapter*{Elementos institucionais pendentes}
+Inserir ficha catalográfica emitida pela biblioteca, folha de aprovação com data e banca confirmadas, e demais elementos exigidos pelo curso/campus. Este arquivo é um ponto de partida, não uma declaração de conformidade institucional final.
+\chapter*{Resumo}
+Propõe-se comparar a verificação de credenciais acadêmicas assinadas digitalmente com duas fontes de confiança em emissores: um cadastro convencional e um registro em blockchain. O protótipo utiliza Rust, PostgreSQL, Solidity e React. Os dados de credenciais permanecem fora da blockchain; apenas autorizações de chaves institucionais são registradas. A avaliação proposta considera segurança, privacidade, disponibilidade, latência, vazão e custos operacionais. Este resumo descreve o plano de pesquisa: os experimentos ainda não foram executados e não há resultados empíricos a declarar.
+
+\noindent Palavras-chave: credenciais acadêmicas; assinatura digital; blockchain; privacidade.
+\selectlanguage{english}
+\chapter*{Abstract}
+This research proposes a controlled comparison of digitally signed academic credentials using conventional and blockchain-backed issuer trust sources. The prototype keeps credential contents off-chain and stores only institutional key authorizations in the ledger. Planned experiments assess security, privacy, availability, latency, throughput and operating costs. No empirical findings are claimed in this draft.
+
+\noindent Keywords: academic credentials; digital signatures; blockchain; privacy.
+\selectlanguage{brazil}
+\tableofcontents
+\chapter{Introdução}
+A verificação de credenciais depende tanto da integridade da assinatura quanto da confiança na chave do emissor. A descentralização do cadastro de emissores altera os pressupostos de governança, disponibilidade e custo, sem garantir a veracidade de uma declaração acadêmica.
+\section{Problema e objetivos}
+Investigar os efeitos da substituição do cadastro convencional de chaves por um registro em blockchain, mantendo constantes os bytes assinados e o algoritmo Ed25519. Comparar desempenho e falhas, explicitar fronteiras de confiança e identificar riscos de exposição e correlação.
+\section{Delimitação}
+O trabalho usa dados sintéticos. Não implementa emissão institucional real, verificação de identidade do titular, revogação individual de diplomas ou provas de conhecimento zero. Não reivindica conformidade com W3C Verifiable Credentials.
+\chapter{Fundamentação e trabalhos relacionados}
+[Desenvolver revisão bibliográfica sobre assinatura digital, modelos de confiança, governança de chaves e credenciais verificáveis. Selecionar e conferir fontes primárias antes de citar resultados.] A especificação de credenciais verificáveis fornece contexto de interoperabilidade, mas não é implementada integralmente neste protótipo \cite{w3cvc}.
+\chapter{Arquitetura e modelo de ameaça}
+A API Axum verifica uma assinatura Ed25519 dos bytes recebidos. O modo convencional consulta uma chave autorizada no PostgreSQL. O modo blockchain consulta a autorização do hash Keccak-256 da mesma chave em um contrato Solidity via Alloy. O endereço Ethereum identifica a instituição e não substitui a chave Ed25519.
+
+Consideram-se atacantes que adulteram credenciais, comprometem administradores, reapresentam dados antigos ou controlam a fonte RPC. A API observa os dados enviados; o registro público pode permitir correlação institucional. Revogar uma chave invalida todas as credenciais associadas no modelo atual. O protótipo não resolve veracidade de alegações nem autorização histórica.
+\chapter{Metodologia}
+\section{Desenho experimental}
+Comparar cargas sintéticas com tamanhos de 1, 4, 16 e 32 KiB e concorrências de 1, 10 e 100. Realizar aquecimento e ao menos cinco repetições independentes. Controlar hardware, versões, chaves e conteúdo. Registrar sementes e identificador do código.
+\section{Métricas}
+Medir latências p50/p95/p99, requisições concluídas por segundo, taxa de erros e disponibilidade sob falhas. Separar custos de verificação, implantação e atualização do registro; registrar rede, política de finalidade, preço de gás e momento das conversões monetárias. Resultados de Anvil não representam custos de rede pública.
+\section{Privacidade e reprodutibilidade}
+Não usar dados pessoais reais. Não persistir conteúdos de credenciais nem seus hashes em blockchain. Documentar observabilidade da API/RPC, retenção e ameaças de correlação. Publicar procedimentos e dados sintéticos, respeitando limitações éticas e institucionais.
+\chapter{Resultados e discussão}
+[PENDENTE: inserir somente medições efetivamente realizadas. Testes de software não substituem experimentos comparativos. Incluir intervalos de incerteza, falhas, custos e ameaças à validade.]
+\chapter{Conclusão}
+[PENDENTE: responder à questão de pesquisa com base nos resultados. Não presumir superioridade de uma arquitetura. Discutir limitações e trabalhos futuros.]
+\begin{thebibliography}{9}
+\bibitem{w3cvc} W3C. \textit{Verifiable Credentials Data Model v2.0}. Disponível em: \url{https://www.w3.org/TR/vc-data-model-2.0/}. [Conferir edição e data de acesso antes da entrega.]
+\bibitem{cefet} CEFET/RJ. \textit{Manual TCC, 3ª edição revisada e atualizada, 2022}. Campus Petrópolis. [Confirmar aplicabilidade ao curso/campus.]
+\end{thebibliography}
+\appendix
+\chapter{Protocolo e artefatos}
+Consultar os arquivos README.md, docs/RESEARCH.md e docs/TEST\_RESULTS.md do monorepositório. [Inserir identificador da versão e endereço público apenas após confirmação do destino.]
+\end{document}

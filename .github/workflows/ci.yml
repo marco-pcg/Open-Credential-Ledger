@@ -1,0 +1,76 @@
+name: CI
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ocl
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: ocl
+        ports: ["5432:5432"]
+        options: --health-cmd="pg_isready -U ocl" --health-interval=3s --health-timeout=3s --health-retries=20
+    env:
+      DATABASE_URL: postgres://ocl:ci-only@localhost:5432/ocl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo test --test database --locked -- --ignored
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: forge build --root contracts
+      - name: Alloy integration against Anvil
+        run: |
+          anvil --silent &
+          ANVIL_PID=$!
+          trap 'kill "$ANVIL_PID"' EXIT
+          for attempt in $(seq 1 30); do
+            if cast chain-id --rpc-url http://localhost:8545; then break; fi
+            sleep 1
+          done
+          RPC_URL=http://localhost:8545 cargo test --test chain --locked -- --ignored
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: forge fmt --check
+      - run: forge test -vvv
+  containers:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config --quiet
+      - run: docker compose build

@@ -1,0 +1,15 @@
+/target/
+frontend/node_modules/
+frontend/dist/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+.env
+*.log
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.bbl
+paper/*.blg
+paper/*.pdf
