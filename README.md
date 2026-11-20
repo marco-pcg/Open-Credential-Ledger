@@ -1,5 +1,7 @@
 # Open Credential Ledger
 
+[![CI](https://github.com/marco-pcg/Open-Credential-Ledger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/marco-pcg/Open-Credential-Ledger/actions/workflows/ci.yml)
+
 Research monorepo comparing conventional issuer trust with blockchain-backed issuer trust for signed academic credential bytes. This is a working research prototype, not an accredited credential service. Repository: [marco-pcg/Open-Credential-Ledger](https://github.com/marco-pcg/Open-Credential-Ledger).
 
 ## Layout
@@ -54,7 +56,7 @@ RPC_URL=http://localhost:8545 cargo test --test chain --locked -- --ignored
 (cd contracts && forge fmt --check && forge test -vvv)
 ```
 
-See [test results](docs/TEST_RESULTS.md) for checks actually run in this environment. CI executes independent backend, database, frontend, contract and container jobs. Deployment is manual until a destination, network and secret management policy are selected; no automatic publication is configured.
+See [test results](docs/TEST_RESULTS.md) for checks actually run in this environment. CI runs four jobs: backend (including PostgreSQL and Alloy/Anvil integration tests), frontend, contracts, and container builds. Deployment is manual until a destination, network and secret management policy are selected; no automatic publication is configured.
 
 ## Scope
 
