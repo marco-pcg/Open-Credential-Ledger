@@ -1,3 +1,5 @@
+pub mod credential;
+
 use alloy::{
     primitives::{Address, keccak256},
     providers::{Provider, ProviderBuilder},
@@ -5,15 +7,16 @@ use alloy::{
 };
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, State},
+    extract::{DefaultBodyLimit, State, rejection::JsonRejection},
     http::StatusCode,
     routing::{get, post},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
+use credential::{Decision, PROFILE_VERSION, parse_issuer, signing_message, validate_claims};
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 sol! { #[sol(rpc)] interface IIssuerRegistry {
     function isAuthorized(address issuer, bytes32 keyHash) external view returns (bool);
@@ -45,7 +48,11 @@ pub struct Verification {
 pub struct Outcome {
     pub valid: bool,
     pub signature_valid: bool,
-    pub issuer_trusted: bool,
+    pub claims_valid: bool,
+    pub issuer_trusted: Option<bool>,
+    pub reason: Decision,
+    pub policy_version: &'static str,
+    pub evaluated_at: u64,
 }
 type ApiError = (StatusCode, &'static str);
 fn bad() -> ApiError {
@@ -58,7 +65,15 @@ fn unavailable() -> ApiError {
     (StatusCode::SERVICE_UNAVAILABLE, "trust source unavailable")
 }
 pub fn check_signature(v: &Verification) -> Result<(Address, [u8; 32], bool), ApiError> {
-    let issuer = v.issuer.parse::<Address>().map_err(|_| bad())?;
+    let issuer = parse_issuer(&v.issuer).ok_or_else(bad)?;
+    if v.public_key.len() != 64
+        || !v
+            .public_key
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(bad());
+    }
     let key: [u8; 32] = hex::decode(&v.public_key)
         .map_err(|_| bad())?
         .try_into()
@@ -74,21 +89,44 @@ pub fn check_signature(v: &Verification) -> Result<(Address, [u8; 32], bool), Ap
     Ok((
         issuer,
         key,
-        key_obj.verify_strict(&payload, &signature).is_ok(),
+        key_obj
+            .verify_strict(&signing_message(&payload), &signature)
+            .is_ok(),
     ))
 }
 async fn verify(
     State(s): State<AppState>,
-    Json(v): Json<Verification>,
+    input: Result<Json<Verification>, JsonRejection>,
 ) -> Result<Json<Outcome>, ApiError> {
+    let Json(v) = input.map_err(|error| (error.status(), "invalid verification envelope"))?;
     let (issuer, key, signature_valid) = check_signature(&v)?;
+    let evaluated_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "verification clock unavailable",
+            )
+        })?
+        .as_secs();
+    let mut outcome = Outcome {
+        valid: false,
+        signature_valid,
+        claims_valid: false,
+        issuer_trusted: None,
+        reason: Decision::InvalidSignature,
+        policy_version: PROFILE_VERSION,
+        evaluated_at,
+    };
     if !signature_valid {
-        return Ok(Json(Outcome {
-            valid: false,
-            signature_valid: false,
-            issuer_trusted: false,
-        }));
+        return Ok(Json(outcome));
     }
+    let payload = STANDARD.decode(&v.payload_base64).map_err(|_| bad())?;
+    if let Err(reason) = validate_claims(&payload, issuer, evaluated_at) {
+        outcome.reason = reason;
+        return Ok(Json(outcome));
+    }
+    outcome.claims_valid = true;
     let trusted = match v.mode {
         Mode::Conventional => {
             let row = sqlx::query("SELECT public_key, active FROM issuers WHERE address = $1")
@@ -121,11 +159,14 @@ async fn verify(
                 .map_err(|_| unavailable())?
         }
     };
-    Ok(Json(Outcome {
-        valid: trusted,
-        signature_valid,
-        issuer_trusted: trusted,
-    }))
+    outcome.valid = trusted;
+    outcome.issuer_trusted = Some(trusted);
+    outcome.reason = if trusted {
+        Decision::Verified
+    } else {
+        Decision::UntrustedIssuer
+    };
+    Ok(Json(outcome))
 }
 async fn ready(State(s): State<AppState>) -> Result<&'static str, ApiError> {
     sqlx::query("SELECT 1")
@@ -153,10 +194,11 @@ mod tests {
     fn fixture() -> Verification {
         let key = SigningKey::from_bytes(&[7; 32]);
         Verification {
-            issuer: format!("{:#x}", Address::ZERO),
+            issuer: "0x0000000000000000000000000000000000000001".into(),
             public_key: hex::encode(key.verifying_key().to_bytes()),
             payload_base64: STANDARD.encode(b"synthetic diploma"),
-            signature_base64: STANDARD.encode(key.sign(b"synthetic diploma").to_bytes()),
+            signature_base64: STANDARD
+                .encode(key.sign(&signing_message(b"synthetic diploma")).to_bytes()),
             mode: Mode::Conventional,
         }
     }

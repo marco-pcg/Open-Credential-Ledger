@@ -1,10 +1,10 @@
+mod common;
 use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
-use base64::{Engine, engine::general_purpose::STANDARD};
-use ed25519_dalek::{Signer, SigningKey};
-use ocl_api::{AppState, Mode, Verification, app};
+use ed25519_dalek::SigningKey;
+use ocl_api::{AppState, Mode, app};
 use tower::ServiceExt;
 #[tokio::test]
 #[ignore = "requires disposable PostgreSQL DATABASE_URL"]
@@ -23,13 +23,13 @@ async fn issuer_trust_and_revocation() {
         registry: None,
         chain_id: None,
     };
-    let v = Verification {
-        issuer: issuer.into(),
-        public_key: hex::encode(key.verifying_key().to_bytes()),
-        payload_base64: STANDARD.encode(b"synthetic"),
-        signature_base64: STANDARD.encode(key.sign(b"synthetic").to_bytes()),
-        mode: Mode::Conventional,
-    };
+    let claims = common::claims(issuer, common::now());
+    let v = common::envelope(
+        &key,
+        issuer,
+        &serde_json::to_vec(&claims).unwrap(),
+        Mode::Conventional,
+    );
     for expected in [true, false] {
         let response = app(state.clone())
             .oneshot(
@@ -46,6 +46,8 @@ async fn issuer_trust_and_revocation() {
         let body: serde_json::Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
         assert_eq!(body["valid"], expected);
+        assert_eq!(body["claims_valid"], true);
+        assert_eq!(body["issuer_trusted"], expected);
         sqlx::query("UPDATE issuers SET active=false WHERE address=$1")
             .bind(issuer)
             .execute(&db)
