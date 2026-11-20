@@ -1,4 +1,6 @@
-# Validation results — 2026-11-15
+# Validation results
+
+## Local validation — 2026-11-15
 
 Local environment: Rust 1.96.0, Node 22.23.5, npm 10.9.9, temporary Foundry 1.7.1, Solidity 0.8.28, PostgreSQL 17 container. Dependencies are recorded in Cargo.lock and frontend/package-lock.json.
 
@@ -20,8 +22,21 @@ Local environment: Rust 1.96.0, Node 22.23.5, npm 10.9.9, temporary Foundry 1.7.
 
 The ordinary Rust suite does not silently require PostgreSQL or Anvil. Integration tests must be invoked explicitly as above; CI provisions both dependencies. Chain tests require `forge build --root contracts` artifacts and a fresh local Anvil (chain ID 31337). The chain test deploys its own registry and uses unlocked local accounts only.
 
-Not performed: TeX/PDF compilation or visual review (no TeX compiler installed), browser interaction/accessibility audit, comparative research benchmarks, public-network deployment, external security audit, GitHub-hosted CI execution. No empirical research results are claimed. npm audit is a point-in-time advisory check, not a security certification.
+Not performed during this local validation: TeX/PDF compilation or visual review (no TeX compiler installed), browser interaction/accessibility audit, comparative research benchmarks, public-network deployment, external security audit, GitHub-hosted CI execution. No empirical research results are claimed. npm audit is a point-in-time advisory check, not a security certification.
 
-Docker initially required access outside the restricted execution context; PostgreSQL and integration tests subsequently ran successfully. No GitHub remote, push, or publication was performed.
+Docker initially required access outside the restricted execution context; PostgreSQL and integration tests subsequently ran successfully. No GitHub remote, push, or publication was performed during the local validation above.
 
 Temporary application/database containers were stopped after validation; the local database volume was preserved. The test-only Anvil node was also stopped. The application is not left running.
+
+## Hosted GitHub Actions verification — 2026-11-20
+
+Issue [#3](https://github.com/marco-pcg/Open-Credential-Ledger/issues/3) was verified against the initial hosted [CI run #43743565984](https://github.com/marco-pcg/Open-Credential-Ledger/actions/runs/43743565984) on `main`, commit `6671071fe319cb28d2cfcdb91b02844494a6b409`. The run completed successfully. Inspection of all four jobs confirmed that each required validation step passed:
+
+| Hosted job | Successful checks |
+| --- | --- |
+| backend | Rust formatting, Clippy with warnings denied, workspace tests, PostgreSQL enrollment/revocation integration, contract compilation, and Alloy integration against Anvil |
+| frontend | Clean dependency installation with `npm ci`, Vitest tests, TypeScript checking and production build |
+| contracts | Foundry formatting and Solidity tests |
+| containers | Docker Compose configuration and builds of both application images |
+
+No workflow failure needed correction. The README now links a live CI badge scoped to `main`; it reflects future runs rather than a fixed historical result. The earlier local-validation exclusions remain historical: hosted CI has now been verified, while paper rendering, browser review, research benchmarks, public-network deployment, and an external security audit remain outside this check.
