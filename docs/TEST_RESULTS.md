@@ -40,3 +40,26 @@ Issue [#3](https://github.com/marco-pcg/Open-Credential-Ledger/issues/3) was ver
 | containers | Docker Compose configuration and builds of both application images |
 
 No workflow failure needed correction. The README now links a live CI badge scoped to `main`; it reflects future runs rather than a fixed historical result. The earlier local-validation exclusions remain historical: hosted CI has now been verified, while paper rendering, browser review, research benchmarks, public-network deployment, and an external security audit remain outside this check.
+
+## Credential-profile validation — 2026-11-20 (issue #4)
+
+Implemented `ocl.academic.v1` on the issue #4 branch. This changes the signed-message format: regenerate old demo credentials using the updated fixture example. No dependency or Solidity storage change was needed.
+
+| Check | Result |
+| --- | --- |
+| Rust workspace tests | 5 existing unit tests and 11 credential-policy acceptance tests passed; the ordinary run explicitly skips the two infrastructure-dependent tests |
+| Published policy vectors | All 20 payload examples match the expected decisions at the fixed manifest clock, including duplicate members, unknown/missing claims, validity dates and issuer mismatch |
+| PostgreSQL integration | 1 passed against an isolated PostgreSQL 17 test container: profile-v1 credential accepted with active issuer key, rejected after key revocation |
+| Alloy/Anvil integration | 1 passed: profile-v1 credential decisions for unauthorized/authorized/revoked keys, plus wrong-chain rejection |
+| Rust formatting and Clippy | Passed, with Clippy warnings denied |
+| Frontend tests | 12 passed, including the displayed policy decisions |
+| Frontend production build | TypeScript checks and Vite bundle passed |
+| Foundry contracts | 5 passed, including 256 fuzz cases; contract code unchanged |
+| Fixture generator | Generated a signed v1 envelope with matching issuer and a 24-hour validity window |
+| Real HTTP smoke test | Accepted the Rust-generated credential after enrollment; also accepted an independently signed Python/cryptography envelope using the specified context; correctly rejected signed expiry, future validity, issuer substitution, unsupported version and unknown claims |
+
+The deterministic policy tests cover inclusive start/exclusive expiry boundaries, signed/envelope issuer binding, profile/context separation, rejection after byte changes, strict claim parsing, and skipped trust lookups for signed invalid claims in both modes. HTTP errors for malformed envelope structure do not echo submitted fields or values. A valid credential cannot turn a trust-source outage into a successful result.
+
+Browser review, paper rendering and comparative benchmarks were not performed for this change. Hosted PR CI results are linked from the pull request once available.
+
+The issue #4 HTTP smoke test used an isolated PostgreSQL container and the publicly known synthetic key only. Its exact fixture row was removed afterward. The temporary API, Anvil node and isolated PostgreSQL container/storage were stopped/removed after validation; the normal project database was not used.

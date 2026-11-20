@@ -1,3 +1,4 @@
+mod common;
 use alloy::{
     primitives::{Address, Bytes, keccak256},
     providers::{Provider, ProviderBuilder},
@@ -7,9 +8,8 @@ use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
-use base64::{Engine, engine::general_purpose::STANDARD};
-use ed25519_dalek::{Signer, SigningKey};
-use ocl_api::{AppState, IIssuerRegistry, Mode, Verification, app};
+use ed25519_dalek::SigningKey;
+use ocl_api::{AppState, IIssuerRegistry, Mode, app};
 use tower::ServiceExt;
 #[tokio::test]
 #[ignore = "requires Anvil RPC_URL and forge build artifacts"]
@@ -57,13 +57,13 @@ async fn onchain_authorization_revocation_and_wrong_chain() {
         registry: Some(address),
         chain_id: Some(31337),
     };
-    let v = Verification {
-        issuer: format!("{issuer:#x}"),
-        public_key: hex::encode(key.verifying_key().to_bytes()),
-        payload_base64: STANDARD.encode(b"synthetic"),
-        signature_base64: STANDARD.encode(key.sign(b"synthetic").to_bytes()),
-        mode: Mode::Blockchain,
-    };
+    let claims = common::claims(&format!("{issuer:#x}"), common::now());
+    let v = common::envelope(
+        &key,
+        &format!("{issuer:#x}"),
+        &serde_json::to_vec(&claims).unwrap(),
+        Mode::Blockchain,
+    );
     for trusted in [false, true, false] {
         assert!(
             registry
@@ -92,6 +92,8 @@ async fn onchain_authorization_revocation_and_wrong_chain() {
         let body: serde_json::Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
         assert_eq!(body["valid"], trusted);
+        assert_eq!(body["claims_valid"], true);
+        assert_eq!(body["issuer_trusted"], trusted);
     }
     state.chain_id = Some(1);
     let response = app(state)
