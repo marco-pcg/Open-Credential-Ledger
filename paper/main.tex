@@ -36,12 +36,12 @@ Coorientador(a): [A CONFIRMAR, SE APLICÁVEL]
 \chapter*{Elementos institucionais pendentes}
 Inserir ficha catalográfica emitida pela biblioteca, folha de aprovação com data e banca confirmadas, e demais elementos exigidos pelo curso/campus. Este arquivo é um ponto de partida, não uma declaração de conformidade institucional final.
 \chapter*{Resumo}
-Propõe-se comparar a verificação de credenciais acadêmicas assinadas digitalmente com duas fontes de confiança em emissores: um cadastro convencional e um registro em blockchain. O protótipo utiliza Rust, PostgreSQL, Solidity e React. Os dados de credenciais permanecem fora da blockchain; apenas autorizações de chaves institucionais são registradas. A avaliação proposta considera segurança, privacidade, disponibilidade, latência, vazão e custos operacionais. Este resumo descreve o plano de pesquisa: os experimentos ainda não foram executados e não há resultados empíricos a declarar.
+Propõe-se comparar a verificação de credenciais acadêmicas assinadas digitalmente com duas fontes de confiança em emissores: um cadastro convencional e um registro em blockchain. O protótipo utiliza Rust, PostgreSQL, Solidity e React. Os dados de credenciais permanecem fora da blockchain; autorizações de chaves institucionais e marcas opacas de revogação individual são registradas, com riscos de correlação explicitados. A avaliação proposta considera segurança, privacidade, disponibilidade, latência, vazão e custos operacionais. Este resumo descreve o plano de pesquisa: os experimentos ainda não foram executados e não há resultados empíricos a declarar.
 
 \noindent Palavras-chave: credenciais acadêmicas; assinatura digital; blockchain; privacidade.
 \selectlanguage{english}
 \chapter*{Abstract}
-This research proposes a controlled comparison of digitally signed academic credentials using conventional and blockchain-backed issuer trust sources. The prototype keeps credential contents off-chain and stores only institutional key authorizations in the ledger. Planned experiments assess security, privacy, availability, latency, throughput and operating costs. No empirical findings are claimed in this draft.
+This research proposes a controlled comparison of digitally signed academic credentials using conventional and blockchain-backed issuer trust sources. The prototype keeps credential contents off-chain and stores institutional key authorizations and opaque credential-revocation handles in the ledger, with correlation risks explicitly considered. Planned experiments assess security, privacy, availability, latency, throughput and operating costs. No empirical findings are claimed in this draft.
 
 \noindent Keywords: academic credentials; digital signatures; blockchain; privacy.
 \selectlanguage{brazil}
@@ -51,13 +51,13 @@ A verificação de credenciais depende tanto da integridade da assinatura quanto
 \section{Problema e objetivos}
 Investigar os efeitos da substituição do cadastro convencional de chaves por um registro em blockchain, mantendo constantes os bytes assinados e o algoritmo Ed25519. Comparar desempenho e falhas, explicitar fronteiras de confiança e identificar riscos de exposição e correlação.
 \section{Delimitação}
-O trabalho usa dados sintéticos. Não implementa emissão institucional real, verificação de identidade do titular, revogação individual de diplomas ou provas de conhecimento zero. Não reivindica conformidade com W3C Verifiable Credentials.
+O trabalho usa dados sintéticos. Não implementa emissão institucional real, verificação de identidade do titular, provas de conhecimento zero ou autorização histórica de emissão. A revogação individual é representada por identificadores opacos derivados do emissor e do identificador aleatório da credencial; esses identificadores permanecem correlacionáveis e não garantem anonimato. Não reivindica conformidade com W3C Verifiable Credentials.
 \chapter{Fundamentação e trabalhos relacionados}
 [Desenvolver revisão bibliográfica sobre assinatura digital, modelos de confiança, governança de chaves e credenciais verificáveis. Selecionar e conferir fontes primárias antes de citar resultados.] A especificação de credenciais verificáveis fornece contexto de interoperabilidade, mas não é implementada integralmente neste protótipo \cite{w3cvc}.
 \chapter{Arquitetura e modelo de ameaça}
 A API Axum verifica uma assinatura Ed25519 de um contexto fixo seguido pelos bytes JSON originais. O perfil de credencial v1 exige identificadores, emissor assinado, declaração de formação acadêmica e datas de emissão e validade; o emissor deve coincidir com o envelope. A validação estrutural e temporal não comprova a veracidade da formação ou a identidade do titular. O modo convencional consulta uma chave autorizada no PostgreSQL. O modo blockchain consulta a autorização do hash Keccak-256 da mesma chave em um contrato Solidity via Alloy. O endereço Ethereum identifica a instituição e não substitui a chave Ed25519.
 
-Consideram-se atacantes que adulteram credenciais, comprometem administradores, reapresentam dados antigos ou controlam a fonte RPC. A API observa os dados enviados; o registro público pode permitir correlação institucional. Revogar uma chave invalida todas as credenciais associadas no modelo atual. O protótipo não resolve veracidade de alegações nem autorização histórica.
+Consideram-se atacantes que adulteram credenciais, comprometem administradores, reapresentam dados antigos ou controlam a fonte RPC. A API observa os dados enviados; o registro público pode permitir correlação institucional. Revogar uma chave invalida todas as credenciais associadas no modelo atual. A revogação individual mantém uma marca permanente por emissor e credencial, sem desativar a chave ou afetar outras credenciais. O protótipo não resolve veracidade de alegações nem autorização histórica.
 \chapter{Metodologia}
 \section{Desenho experimental}
 Comparar cargas sintéticas com tamanhos de 1, 4, 16 e 32 KiB e concorrências de 1, 10 e 100. Realizar aquecimento e ao menos cinco repetições independentes. Controlar hardware, versões, chaves e conteúdo. Registrar sementes e identificador do código.

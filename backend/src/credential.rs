@@ -1,5 +1,5 @@
 //! OCL academic credential profile v1. See docs/CREDENTIALS_V1.md.
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256, keccak256};
 use serde::{
     Deserialize, Deserializer, Serialize,
     de::{MapAccess, Visitor, value::MapAccessDeserializer},
@@ -86,6 +86,7 @@ pub enum Decision {
     NotYetValid,
     Expired,
     UntrustedIssuer,
+    RevokedCredential,
 }
 
 /// Sign the context followed by the original UTF-8 JSON bytes, never reserialized JSON.
@@ -132,7 +133,7 @@ pub fn validate_claims(
     if parse_issuer(&claims.issuer) != Some(envelope_issuer) {
         return Err(Decision::IssuerMismatch);
     }
-    if !opaque_id(&claims.credential_id, "urn:ocl:credential:")
+    if !is_credential_id(&claims.credential_id)
         || !opaque_id(&claims.subject_id, "urn:ocl:subject:")
         || claims.award.name.trim() != claims.award.name
         || claims.award.name.is_empty()
@@ -155,4 +156,25 @@ pub fn validate_claims(
         return Err(Decision::Expired);
     }
     Ok(claims)
+}
+
+/// Opaque status identifier, distinct from a hash of credential contents or subject data.
+/// Privacy requires an unpredictable credential ID; see docs/REVOCATION.md.
+pub fn revocation_handle(issuer: Address, credential_id: &str) -> B256 {
+    keccak256(
+        [
+            b"OpenCredentialLedger:revocation:v1\n".as_slice(),
+            issuer.as_slice(),
+            credential_id.as_bytes(),
+        ]
+        .concat(),
+    )
+}
+pub fn new_credential_id() -> Result<String, getrandom::Error> {
+    let mut entropy = [0u8; 32];
+    getrandom::fill(&mut entropy)?;
+    Ok(format!("urn:ocl:credential:{}", hex::encode(entropy)))
+}
+pub fn is_credential_id(value: &str) -> bool {
+    opaque_id(value, "urn:ocl:credential:")
 }
