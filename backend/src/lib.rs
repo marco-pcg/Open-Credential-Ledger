@@ -12,7 +12,9 @@ use axum::{
     routing::{get, post},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
-use credential::{Decision, PROFILE_VERSION, parse_issuer, signing_message, validate_claims};
+use credential::{
+    Decision, JsonObject, PROFILE_VERSION, parse_issuer, signing_message, validate_claims,
+};
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
@@ -96,9 +98,10 @@ pub fn check_signature(v: &Verification) -> Result<(Address, [u8; 32], bool), Ap
 }
 async fn verify(
     State(s): State<AppState>,
-    input: Result<Json<Verification>, JsonRejection>,
+    input: Result<Json<JsonObject<Verification>>, JsonRejection>,
 ) -> Result<Json<Outcome>, ApiError> {
-    let Json(v) = input.map_err(|error| (error.status(), "invalid verification envelope"))?;
+    let Json(JsonObject(v)) =
+        input.map_err(|error| (error.status(), "invalid verification envelope"))?;
     let (issuer, key, signature_valid) = check_signature(&v)?;
     let evaluated_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)

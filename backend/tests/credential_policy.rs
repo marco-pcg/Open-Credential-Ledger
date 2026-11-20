@@ -331,3 +331,60 @@ async fn envelope_structure_errors_do_not_echo_submitted_data() {
     let bytes = to_bytes(r.into_body(), 65536).await.unwrap();
     assert_eq!(bytes.as_ref(), b"invalid verification envelope");
 }
+
+#[test]
+fn rejects_positional_arrays_for_claims_and_award() {
+    let c = common::claims(ISSUER, NOW);
+    let positional = json!([
+        c["schema_version"],
+        c["credential_id"],
+        c["issuer"],
+        c["subject_id"],
+        c["award"],
+        c["issued_at"],
+        c["valid_from"],
+        c["valid_until"]
+    ]);
+    let mut nested = c.clone();
+    nested["award"] = json!(["degree", "Synthetic degree"]);
+    for value in [positional, nested] {
+        assert_eq!(
+            validate_claims(
+                &serde_json::to_vec(&value).unwrap(),
+                ISSUER.parse().unwrap(),
+                NOW
+            )
+            .err(),
+            Some(Decision::InvalidClaims)
+        );
+    }
+}
+#[tokio::test]
+async fn rejects_positional_envelope_arrays() {
+    let key = SigningKey::from_bytes(&[7; 32]);
+    let v = common::envelope(
+        &key,
+        ISSUER,
+        &serde_json::to_vec(&common::claims(ISSUER, common::now())).unwrap(),
+        Mode::Blockchain,
+    );
+    let positional = json!([
+        v.issuer,
+        v.public_key,
+        v.payload_base64,
+        v.signature_base64,
+        v.mode
+    ]);
+    let r = app(state())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/verify")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&positional).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}

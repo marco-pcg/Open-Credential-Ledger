@@ -1,6 +1,37 @@
 //! OCL academic credential profile v1. See docs/CREDENTIALS_V1.md.
 use alloy::primitives::Address;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{MapAccess, Visitor, value::MapAccessDeserializer},
+};
+use std::{fmt, marker::PhantomData};
+
+/// JSON struct deserialization also accepts positional arrays by default. Require a map
+/// without converting to Value, so duplicate-member detection remains intact.
+pub(crate) fn deserialize_object<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct ObjectVisitor<T>(PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for ObjectVisitor<T> {
+        type Value = T;
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a JSON object")
+        }
+        fn visit_map<M: MapAccess<'de>>(self, map: M) -> Result<T, M::Error> {
+            T::deserialize(MapAccessDeserializer::new(map))
+        }
+    }
+    deserializer.deserialize_map(ObjectVisitor(PhantomData))
+}
+
+pub(crate) struct JsonObject<T>(pub T);
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for JsonObject<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserialize_object(deserializer).map(Self)
+    }
+}
 
 pub const PROFILE_VERSION: &str = "ocl.academic.v1";
 pub const SIGNING_CONTEXT: &[u8] = b"OpenCredentialLedger:academic:v1\n";
@@ -14,6 +45,7 @@ pub struct ClaimsV1 {
     pub credential_id: String,
     pub issuer: String,
     pub subject_id: String,
+    #[serde(deserialize_with = "deserialize_object")]
     pub award: Award,
     pub issued_at: u64,
     pub valid_from: u64,
@@ -80,7 +112,9 @@ pub fn validate_claims(
 ) -> Result<ClaimsV1, Decision> {
     // Deserialize directly into strict structs: duplicate/unknown members, missing fields,
     // invalid UTF-8, trailing data, fractional/negative timestamps and nesting errors fail.
-    let claims: ClaimsV1 = serde_json::from_slice(payload).map_err(|_| Decision::InvalidClaims)?;
+    let claims = serde_json::from_slice::<JsonObject<ClaimsV1>>(payload)
+        .map_err(|_| Decision::InvalidClaims)?
+        .0;
     if claims.schema_version != PROFILE_VERSION {
         return Err(Decision::UnsupportedVersion);
     }
