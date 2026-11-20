@@ -13,7 +13,8 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use credential::{
-    Decision, JsonObject, PROFILE_VERSION, parse_issuer, signing_message, validate_claims,
+    Decision, JsonObject, PROFILE_VERSION, parse_issuer, revocation_handle, signing_message,
+    validate_claims,
 };
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 sol! { #[sol(rpc)] interface IIssuerRegistry {
     function isAuthorized(address issuer, bytes32 keyHash) external view returns (bool);
     function setAuthorization(address issuer, bytes32 keyHash, bool active) external;
+    function revokeCredential(address issuer, bytes32 handle) external;
+    function isRevoked(address issuer, bytes32 handle) external view returns (bool);
+    function verificationStatus(address issuer, bytes32 keyHash, bytes32 handle) external view returns (bool keyAuthorized, bool credentialRevoked);
 } }
 #[derive(Clone)]
 pub struct AppState {
@@ -53,6 +57,7 @@ pub struct Outcome {
     pub signature_valid: bool,
     pub claims_valid: bool,
     pub issuer_trusted: Option<bool>,
+    pub credential_revoked: Option<bool>,
     pub reason: Decision,
     pub policy_version: &'static str,
     pub evaluated_at: u64,
@@ -118,6 +123,7 @@ async fn verify(
         signature_valid,
         claims_valid: false,
         issuer_trusted: None,
+        credential_revoked: None,
         reason: Decision::InvalidSignature,
         policy_version: PROFILE_VERSION,
         evaluated_at,
@@ -126,22 +132,31 @@ async fn verify(
         return Ok(Json(outcome));
     }
     let payload = STANDARD.decode(&v.payload_base64).map_err(|_| bad())?;
-    if let Err(reason) = validate_claims(&payload, issuer, evaluated_at) {
-        outcome.reason = reason;
-        return Ok(Json(outcome));
-    }
+    let claims = match validate_claims(&payload, issuer, evaluated_at) {
+        Ok(claims) => claims,
+        Err(reason) => {
+            outcome.reason = reason;
+            return Ok(Json(outcome));
+        }
+    };
     outcome.claims_valid = true;
-    let trusted = match v.mode {
+    let handle = revocation_handle(issuer, &claims.credential_id);
+    let (trusted, revoked) = match v.mode {
         Mode::Conventional => {
-            let row = sqlx::query("SELECT public_key, active FROM issuers WHERE address = $1")
+            // One SQL statement gives issuer trust and revocation one MVCC snapshot.
+            let row = sqlx::query("SELECT public_key, active, EXISTS(SELECT 1 FROM credential_revocations r WHERE r.issuer = i.address AND r.handle = $2) AS revoked FROM issuers i WHERE address = $1")
                 .bind(format!("{issuer:#x}"))
-                .fetch_optional(&s.db)
-                .await
-                .map_err(|_| unavailable())?;
-            row.is_some_and(|r| {
-                r.get::<bool, _>("active") && r.get::<String, _>("public_key") == hex::encode(key)
+                .bind(hex::encode(handle))
+                .fetch_optional(&s.db).await.map_err(|_| unavailable())?;
+            row.map_or((false, false), |r| {
+                (
+                    r.get::<bool, _>("active")
+                        && r.get::<String, _>("public_key") == hex::encode(key),
+                    r.get::<bool, _>("revoked"),
+                )
             })
         }
+
         Mode::Blockchain => {
             let url = s
                 .rpc_url
@@ -156,19 +171,23 @@ async fn verify(
                 return Err(unavailable());
             }
             let registry = IIssuerRegistry::new(s.registry.ok_or_else(unavailable)?, provider);
-            registry
-                .isAuthorized(issuer, keccak256(key))
+            let status = registry
+                .verificationStatus(issuer, keccak256(key), handle)
                 .call()
                 .await
-                .map_err(|_| unavailable())?
+                .map_err(|_| unavailable())?;
+            (status.keyAuthorized, status.credentialRevoked)
         }
     };
-    outcome.valid = trusted;
+    outcome.valid = trusted && !revoked;
     outcome.issuer_trusted = Some(trusted);
-    outcome.reason = if trusted {
-        Decision::Verified
-    } else {
+    outcome.credential_revoked = trusted.then_some(revoked);
+    outcome.reason = if !trusted {
         Decision::UntrustedIssuer
+    } else if revoked {
+        Decision::RevokedCredential
+    } else {
+        Decision::Verified
     };
     Ok(Json(outcome))
 }

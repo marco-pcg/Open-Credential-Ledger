@@ -6,6 +6,8 @@ contract IssuerRegistry {
     address public owner;
     address public pendingOwner;
     mapping(address => mapping(bytes32 => bool)) private authorized;
+    mapping(address => mapping(bytes32 => bool)) private revokedCredentials;
+    event CredentialRevoked(address indexed issuer, bytes32 indexed handle);
     event AuthorizationChanged(address indexed issuer, bytes32 indexed keyHash, bool active);
     event OwnershipTransferStarted(address indexed candidate);
     event OwnershipTransferred(address indexed previous, address indexed current);
@@ -29,6 +31,28 @@ contract IssuerRegistry {
 
     function isAuthorized(address issuer, bytes32 keyHash) external view returns (bool) {
         return authorized[issuer][keyHash];
+    }
+
+    /// @notice Permanently revoke an issuer-scoped opaque handle; never pass student data.
+    function revokeCredential(address issuer, bytes32 handle) external onlyOwner {
+        if (issuer == address(0) || handle == bytes32(0)) revert InvalidInput();
+        if (!revokedCredentials[issuer][handle]) {
+            revokedCredentials[issuer][handle] = true;
+            emit CredentialRevoked(issuer, handle);
+        }
+    }
+
+    function isRevoked(address issuer, bytes32 handle) external view returns (bool) {
+        return revokedCredentials[issuer][handle];
+    }
+
+    /// @notice Read key trust and credential status from the same EVM state snapshot.
+    function verificationStatus(address issuer, bytes32 keyHash, bytes32 handle)
+        external
+        view
+        returns (bool keyAuthorized, bool credentialRevoked)
+    {
+        return (authorized[issuer][keyHash], revokedCredentials[issuer][handle]);
     }
 
     function transferOwnership(address candidate) external onlyOwner {

@@ -44,24 +44,9 @@ fn state() -> AppState {
     }
 }
 async fn request(v: &Verification) -> (StatusCode, Value) {
-    let r = app(state())
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/verify")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(v).unwrap()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = r.status();
-    let bytes = to_bytes(r.into_body(), 65536).await.unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
+    common::request(state(), v).await
 }
+
 #[test]
 fn published_examples_match_the_policy() {
     let (root, manifest) = vectors();
@@ -255,6 +240,7 @@ async fn signed_invalid_claims_are_rejected_before_either_trust_lookup() {
             assert_eq!(body["signature_valid"], true);
             assert_eq!(body["claims_valid"], false);
             assert!(body["issuer_trusted"].is_null());
+            assert!(body["credential_revoked"].is_null());
             assert_eq!(body["reason"], reason);
             assert_eq!(body["policy_version"], PROFILE_VERSION);
             assert!(body["evaluated_at"].as_u64().unwrap() >= now);
@@ -274,6 +260,7 @@ async fn changing_signed_bytes_fails_before_claims_or_trust() {
     assert_eq!(body["reason"], "invalid_signature");
     assert_eq!(body["claims_valid"], false);
     assert!(body["issuer_trusted"].is_null());
+    assert!(body["credential_revoked"].is_null());
 }
 #[tokio::test]
 async fn valid_claims_do_not_hide_a_trust_source_outage() {

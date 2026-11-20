@@ -62,8 +62,10 @@ See [test results](docs/TEST_RESULTS.md) for checks actually run in this environ
 
 Credentials use the versioned [OCL academic profile v1](docs/CREDENTIALS_V1.md), with required identifiers, a signed issuer, an academic award, and issuance/validity dates. Ed25519 signatures cover a fixed profile context followed by the exact UTF-8 JSON payload bytes; transport uses standard Base64. The institutional Ethereum address is a registry identifier, not the Ed25519 signing key. A registry entry authorizes the Keccak-256 hash of that Ed25519 public key. Conventional mode compares the same key against PostgreSQL.
 
-`valid` requires signature integrity, valid profile-v1 claims, signed/envelope issuer binding, an active validity window, and current issuer/key authorization. It does not assert the truth of a degree, holder identity, historical authorization, or credential-level revocation. No W3C VC conformance, zero-knowledge proof or selective-disclosure claim is made. Credentials are submitted transiently to this server; verification is not client-only.
+`valid` requires signature integrity, valid profile-v1 claims, signed/envelope issuer binding, an active validity window, current issuer/key authorization, and a non-revoked credential ID. It does not assert the truth of a degree, holder identity, historical authorization, or future revocation status. No W3C VC conformance, zero-knowledge proof or selective-disclosure claim is made. Credentials are submitted transiently to this server; verification is not client-only.
 
 MIT licensed; see [CONTRIBUTING](CONTRIBUTING.md) and [SECURITY](SECURITY.md).
 
 The original arbitrary-byte signing format is replaced by profile v1. Regenerate demonstration credentials with `cargo run -p ocl-api --example fixture`; generated fixtures expire after 24 hours. Published [valid/invalid payload vectors](examples/credentials/v1/README.md) use a fixed test clock and are not ready-to-submit envelopes.
+
+[Credential-level revocation](docs/REVOCATION.md) uses issuer-scoped opaque handles and permanent tombstones in each selected trust source. New demo credential IDs use 256-bit randomness. Handles remain linkable; predictable IDs are unsafe for public publication. Existing registries must be redeployed with the updated ABI and their key/status state restored; an old registry fails closed.

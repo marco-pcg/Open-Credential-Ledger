@@ -1,17 +1,18 @@
 export type Decision = 'verified' | 'invalid_signature' | 'invalid_claims' | 'unsupported_version' |
-  'issuer_mismatch' | 'invalid_dates' | 'not_yet_valid' | 'expired' | 'untrusted_issuer';
+  'issuer_mismatch' | 'invalid_dates' | 'not_yet_valid' | 'expired' | 'untrusted_issuer' | 'revoked_credential';
 export type Outcome = {
   valid: boolean;
   signature_valid: boolean;
   claims_valid: boolean;
   issuer_trusted: boolean | null;
+  credential_revoked: boolean | null;
   reason: Decision;
   policy_version: string;
   evaluated_at: number;
 };
 export function verificationMessage(result: Outcome): string {
   const messages: Record<Decision, string> = {
-    verified: 'Signature, credential policy, and current issuer authorization passed.',
+    verified: 'Signature, credential policy, issuer authorization, and revocation checks passed.',
     invalid_signature: 'The signature does not match the signed credential bytes.',
     invalid_claims: 'The signed credential does not match the required credential format.',
     unsupported_version: 'This credential profile version is not supported.',
@@ -19,6 +20,7 @@ export function verificationMessage(result: Outcome): string {
     invalid_dates: 'The credential contains invalid or inconsistent dates.',
     not_yet_valid: 'The credential is not yet valid.',
     expired: 'The credential has expired.',
+    revoked_credential: 'This credential has been revoked.',
     untrusted_issuer: 'The signature and claims passed, but the issuer key is not currently authorized.',
   };
   return messages[result.reason] ?? 'Verification unsuccessful.';

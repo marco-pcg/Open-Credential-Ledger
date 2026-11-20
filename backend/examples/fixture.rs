@@ -1,6 +1,9 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signer, SigningKey};
-use ocl_api::credential::{Award, AwardKind, ClaimsV1, PROFILE_VERSION, signing_message};
+use ocl_api::credential::{
+    Award, AwardKind, ClaimsV1, PROFILE_VERSION, new_credential_id, revocation_handle,
+    signing_message,
+};
 use std::time::{SystemTime, UNIX_EPOCH};
 fn main() {
     // Public deterministic fixture key. NEVER use it for real credentials.
@@ -12,7 +15,7 @@ fn main() {
     let issuer = "0x0000000000000000000000000000000000000001";
     let claims = ClaimsV1 {
         schema_version: PROFILE_VERSION.into(),
-        credential_id: "urn:ocl:credential:synthetic-001".into(),
+        credential_id: new_credential_id().expect("OS randomness unavailable"),
         issuer: issuer.into(),
         subject_id: "urn:ocl:subject:synthetic-001".into(),
         award: Award {
@@ -32,6 +35,10 @@ fn main() {
     eprintln!(
         "keyHash: {:#x}",
         alloy::primitives::keccak256(key.verifying_key().to_bytes())
+    );
+    eprintln!(
+        "revocationHandle: {:#x}",
+        revocation_handle(issuer.parse().unwrap(), &claims.credential_id)
     );
     eprintln!("Synthetic profile v1 fixture expires in 24 hours; regenerate as needed.");
 }

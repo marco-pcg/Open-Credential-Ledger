@@ -69,3 +69,21 @@ The issue #4 HTTP smoke test used an isolated PostgreSQL container and the publi
 Post-merge review found that Serde's derived struct deserializer also accepts positional JSON arrays. New regression tests reproduced the mismatch with the profile's object-only contract before the fix: array claims passed policy validation, and array envelopes reached the trust lookup instead of returning a client error.
 
 The follow-up requires JSON maps for the request envelope, claims root, and nested award, plus JSON strings for award kind and mode (also rejecting externally tagged enum objects). It preserves direct typed deserialization so duplicate-member rejection is retained. Three additional published vectors cover positional claims/award arrays and an object-encoded award kind (23 vectors total). All 14 policy tests and the 5 original Rust unit tests passed after the fix, along with formatting and Clippy with warnings denied. No signing rules, required fields, or trust storage changed.
+
+## Credential-level revocation — 2026-11-20 (issue #5)
+
+| Check | Result |
+| --- | --- |
+| Rust workspace unit/policy/handle tests | 21 passed; infrastructure tests are explicitly ignored in the ordinary run |
+| PostgreSQL integration | 2 passed against isolated PostgreSQL 17: active/revoked credential decisions, unaffected sibling credentials, same-ID issuer isolation, idempotence, key-change persistence, and append-only update/delete rejection |
+| Alloy/Anvil integration | 3 passed: key authorization/wrong-chain baseline; individual revocation lifecycle and issuer isolation; old registry ABI rejected with 503 |
+| Foundry tests | 11 passed, including two fuzz tests with 256 runs each and the Rust/Solidity handle interoperability vector |
+| Frontend tests | 13 passed, including revoked-credential feedback |
+| Frontend build | TypeScript checking and production bundle passed |
+| Rust formatting and Clippy | Passed with warnings denied |
+| Live HTTP smoke test | Two generated credentials passed initially; revoking one rejected only that credential while the sibling and issuer key remained valid |
+| Fixture generation | Fresh, distinct 256-bit random credential IDs; handle printed for the exact generated credential |
+
+Total: 50 automated tests passed across these suites, plus the live HTTP smoke check. The new direct dependency on getrandom 0.3.4 uses the version already present in Cargo.lock. Claims/signing remain profile v1; the registry ABI and response status fields change as documented in REVOCATION.md.
+
+Tests use synthetic data only. No public-chain transaction, real-wallet operation, browser review, paper rendering, or comparative benchmark was performed. The isolated database/API/Anvil processes are removed/stopped after validation; the normal project database is not used. Append-only test tombstones remain only in the disposable test database until that container/storage is removed. Hosted CI evidence is recorded in the PR.
