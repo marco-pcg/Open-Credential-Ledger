@@ -4,7 +4,7 @@ Status: implemented research profile, defined by issue #4. Profile identifier: `
 
 ## Signed payload
 
-The payload is exactly one UTF-8 JSON object with these required fields. No field is optional or nullable. Unknown or duplicate members are rejected, including inside `award`. Trailing whitespace is allowed as part of the signed bytes; trailing JSON values are rejected.
+The payload is exactly one UTF-8 JSON object with these required fields. Positional arrays are rejected for the envelope, payload root, and nested `award` object. `award.kind` and envelope `mode` must be JSON strings, not object-encoded enum variants. No field is optional or nullable. Unknown or duplicate members are rejected, including inside `award`. Trailing whitespace is allowed as part of the signed bytes; trailing JSON values are rejected.
 
 | Field | Type and constraints |
 | --- | --- |

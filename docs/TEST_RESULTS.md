@@ -63,3 +63,9 @@ The deterministic policy tests cover inclusive start/exclusive expiry boundaries
 Browser review, paper rendering and comparative benchmarks were not performed for this change. Hosted PR CI results are linked from the pull request once available.
 
 The issue #4 HTTP smoke test used an isolated PostgreSQL container and the publicly known synthetic key only. Its exact fixture row was removed afterward. The temporary API, Anvil node and isolated PostgreSQL container/storage were stopped/removed after validation; the normal project database was not used.
+
+## Object-shape review regression — 2026-11-20
+
+Post-merge review found that Serde's derived struct deserializer also accepts positional JSON arrays. New regression tests reproduced the mismatch with the profile's object-only contract before the fix: array claims passed policy validation, and array envelopes reached the trust lookup instead of returning a client error.
+
+The follow-up requires JSON maps for the request envelope, claims root, and nested award, plus JSON strings for award kind and mode (also rejecting externally tagged enum objects). It preserves direct typed deserialization so duplicate-member rejection is retained. Three additional published vectors cover positional claims/award arrays and an object-encoded award kind (23 vectors total). All 14 policy tests and the 5 original Rust unit tests passed after the fix, along with formatting and Clippy with warnings denied. No signing rules, required fields, or trust storage changed.
