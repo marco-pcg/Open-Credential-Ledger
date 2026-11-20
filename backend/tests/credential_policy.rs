@@ -347,7 +347,9 @@ fn rejects_positional_arrays_for_claims_and_award() {
     ]);
     let mut nested = c.clone();
     nested["award"] = json!(["degree", "Synthetic degree"]);
-    for value in [positional, nested] {
+    let mut kind_object = c.clone();
+    kind_object["award"]["kind"] = json!({"degree":null});
+    for value in [positional, nested, kind_object] {
         assert_eq!(
             validate_claims(
                 &serde_json::to_vec(&value).unwrap(),
@@ -382,6 +384,31 @@ async fn rejects_positional_envelope_arrays() {
                 .uri("/api/verify")
                 .header("content-type", "application/json")
                 .body(Body::from(serde_json::to_vec(&positional).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn rejects_object_encoded_mode_variants() {
+    let key = SigningKey::from_bytes(&[7; 32]);
+    let v = common::envelope(
+        &key,
+        ISSUER,
+        &serde_json::to_vec(&common::claims(ISSUER, common::now())).unwrap(),
+        Mode::Blockchain,
+    );
+    let mut envelope = serde_json::to_value(&v).unwrap();
+    envelope["mode"] = json!({"blockchain":null});
+    let r = app(state())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/verify")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&envelope).unwrap()))
                 .unwrap(),
         )
         .await

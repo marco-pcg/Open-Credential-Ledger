@@ -26,6 +26,16 @@ where
     deserializer.deserialize_map(ObjectVisitor(PhantomData))
 }
 
+/// Unit enums otherwise also accept externally tagged objects such as {"degree": null}.
+pub(crate) fn deserialize_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    T::deserialize(serde::de::value::StringDeserializer::<D::Error>::new(value))
+}
+
 pub(crate) struct JsonObject<T>(pub T);
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for JsonObject<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -54,6 +64,7 @@ pub struct ClaimsV1 {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Award {
+    #[serde(deserialize_with = "deserialize_string")]
     pub kind: AwardKind,
     pub name: String,
 }

@@ -44,6 +44,7 @@ pub struct Verification {
     pub public_key: String,
     pub payload_base64: String,
     pub signature_base64: String,
+    #[serde(deserialize_with = "credential::deserialize_string")]
     pub mode: Mode,
 }
 #[derive(Serialize)]
